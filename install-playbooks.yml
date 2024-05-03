@@ -1,0 +1,4 @@
+---
+- import_playbook: ansible/docker-install.yml
+- import_playbook: ansible/docker-swarm-initialization.yml
+- import_playbook: ansible/prometheus-swarm-install.yml

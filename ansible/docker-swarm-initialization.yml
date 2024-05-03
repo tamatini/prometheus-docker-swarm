@@ -1,0 +1,60 @@
+---
+- name: Initialize Swarm
+  hosts: jeffrey-swarm-manager1
+  become: yes
+  remote_user: vagrant
+  tasks:
+  - name: Leave swarm
+    shell: docker swarm leave --force
+    ignore_errors: yes
+    delegate_to: "{{ item }}"
+    with_items:
+      - jeffrey-swarm-manager1
+      - jeffrey-swarm-manager2
+      - jeffrey-swarm-manager3
+      - jeffrey-swarm-node1
+      - jeffrey-swarm-node2
+
+  - name: Determine swarm status
+    shell: > 
+      docker info | grep 'Swarm: ' | cut -d ' ' -f3 
+    delegate_to: jeffrey-swarm-manager1
+    register: swarm_status
+
+  - name: debug swarm status
+    debug:
+      var: swarm_status.stdout
+
+  - name: Initialize swarm
+    shell: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
+    delegate_to: jeffrey-swarm-manager1
+    when: "'inactive' in swarm_status.stdout"
+  
+  - name: Save swarm manager IP
+    command: echo '{{ ansible_default_ipv4.address }}'
+    delegate_to: jeffrey-swarm-manager1
+    register: swarm_manager_ip
+  
+  - name: Get swarm manager token & save in variable
+    command: docker swarm join-token -q manager
+    delegate_to: jeffrey-swarm-manager1
+    register: swarm_manager_token
+
+  - name: Get swarm worker token
+    command: docker swarm join-token -q worker
+    delegate_to: jeffrey-swarm-manager1
+    register: swarm_worker_token
+  
+  - name: Register swarm manager
+    command: docker swarm join --token {{ swarm_manager_token.stdout }} {{ swarm_manager_ip.stdout }}:2377
+    delegate_to: "{{ item }}"
+    with_items:
+      - jeffrey-swarm-manager2
+      - jeffrey-swarm-manager3 
+
+  - name: Register swarm worker
+    command: docker swarm join --token {{ swarm_worker_token.stdout }} {{ swarm_manager_ip.stdout }}:2377
+    delegate_to: "{{ item }}"
+    with_items:
+      - jeffrey-swarm-node1
+      - jeffrey-swarm-node2

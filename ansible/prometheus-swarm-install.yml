@@ -1,0 +1,38 @@
+---
+- name: Initialize prometheus swarm demo
+  hosts: jeffrey-swarm-manager1
+  become: yes
+  remote_user: vagrant
+  tasks:
+  - name: Copy prometheus file
+    copy:
+      src: ../files/prometheus.yml
+      dest: /home/vagrant/prometheus.yml
+      owner: vagrant
+      group: vagrant
+      mode: 0644
+
+  - name: Copy docker compose file
+    copy:
+      src: ../files/docker-compose.yml
+      dest: /home/vagrant/docker-compose.yml
+      owner: vagrant
+      group: vagrant
+      mode: 0644
+
+  - name: Copy docker daemon
+    copy:
+      src: ../files/daemon.json
+      dest: /etc/docker/daemon.json
+      owner: vagrant
+      group: vagrant
+      mode: 0644
+
+  - name: Restart docker
+    service:
+      name: docker
+      state: restarted
+
+  - name: Install docker-compose file
+    command: docker stack deploy -c /home/docker-compose.yml prometheus
+    when: docker_file.stat.exists

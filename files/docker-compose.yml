@@ -1,0 +1,154 @@
+version: "3.8"
+services:
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - 9090:9090
+    deploy:
+      mode: global
+    depends_on:
+      - node-exporter
+      - cadvisor
+      - docker-exporter
+      - ad
+
+  cadvisor:
+    image: google/cadvisor
+    container_name: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - 8080:8080
+    deploy:
+      mode: global
+
+  node-exporter:
+    image: prom/node-exporter
+    container_name: node-exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - 9100:9100
+    deploy:
+      mode: global
+
+  ad:
+    image: tamatini/adservice:2.0.1102
+    environment:
+      PORT: 9555
+    container_name: adservice
+    deploy:
+      replicas: 3
+
+  cart:
+    image: tamatini/cartservice:2.0.1122
+    environment:
+      REDIS_ADDR: redis-cart:6379
+    deploy:
+      replicas: 3
+
+  checkout:
+    image: tamatini/checkoutservice:2.0.1139
+    environment:
+      PORT: 5050
+      PRODUCT_CATALOG_SERVICE_ADDR: productcatalog:3550
+      SHIPPING_SERVICE_ADDR: shipping:50051
+      PAYMENT_SERVICE_ADDR: payment:50051
+      EMAIL_SERVICE_ADDR: email:5000
+      CURRENCY_SERVICE_ADDR: currency:7000
+      CART_SERVICE_ADDR: cart:7070
+    deploy:
+      replicas: 3
+
+  currency:
+    image: tamatini/currencyservice:2.0.1152
+    environment:
+      PORT: 7000
+      DISABLE_PROFILER: 1
+    deploy:
+      replicas: 3
+
+  email:
+    image: tamatini/emailservice:2.0.1168
+    environment:
+      PORT: 8080
+      DISABLE_PROFILER: 1
+    deploy:
+      replicas: 3
+
+  frontend:
+    image: tamatini/frontend:2.0.1176
+    environment:
+      PORT: 8080
+      PRODUCT_CATALOG_SERVICE_ADDR: productcatalog:3550
+      CURRENCY_SERVICE_ADDR: currency:7000
+      CART_SERVICE_ADDR: cart:7070
+      RECOMMENDATION_SERVICE_ADDR: recommendation:8080
+      SHIPPING_SERVICE_ADDR: shipping:50051
+      CHECKOUT_SERVICE_ADDR: checkout:5050
+      AD_SERVICE_ADDR: ad:9555
+    ports:
+      - 80:8080
+    deploy:
+      replicas: 3
+
+  payment:
+    image: tamatini/paymentservice:2.0.1185
+    environment:
+      PORT: 50051
+      DISABLE_PROFILER: 1
+    deploy:
+      replicas: 3
+
+  productcatalog:
+    image: tamatini/productcatalogservice:2.0.1193
+    environment:
+      PORT: 3550
+      DISABLE_PROFILER: 1
+    deploy:
+      replicas: 3
+
+  recommendation:
+    image: tamatini/recomendationservice:2.0.1207
+    environment:
+      PORT: 8080
+      PRODUCT_CATALOG_SERVICE_ADDR: productcatalog:3550
+      DISABLE_PROFILER: 1
+    deploy:
+      replicas: 3
+
+  redis-cart:
+    image: redis:alpine
+
+  shipping:
+    image: tamatini/shippingservice:2.0.1212
+    environment:
+      PORT: 50051
+      DISABLE_PROFILER: 1
+    deploy:
+      replicas: 3
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+
+volumes:
+  grafana-storage: {}
